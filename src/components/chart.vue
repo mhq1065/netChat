@@ -4,8 +4,9 @@
         flex-direction: row;
         height: 100%;
     }
+    /* 好友列表 */
     .chat-friends {
-        width: 200px;
+        flex-grow: 1;
         background-color: rgb(240, 240, 240);
     }
     .chat-friends__item {
@@ -21,13 +22,24 @@
     .friends__item_unchoosen {
         background-color: rgb(240, 240, 240);
     }
+    /* 聊天 */
     .msg-box {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         flex-grow: 1;
     }
-    .msg {
+    .msg-title {
+        height: 20px;
+        padding: 20px 50px;
+        font-size: 25px;
+        text-align: left;
+        -webkit-app-region: drag;
+        -webkit-user-select: none;
+        background-color: rgb(245, 245, 245);
+        border-bottom: 1px solid rgb(231, 231, 231);
+    }
+    .msg-body {
         height: 200px;
         overflow: auto;
         flex-grow: 1;
@@ -35,30 +47,30 @@
         background-color: rgb(245, 245, 245);
         text-align: left;
     }
-    .msg-item{
+    .msg-item {
         height: 30px;
     }
     .msg-in {
-        margin: 25px 0;
+        margin: 5px 0;
         width: 100%;
-        height: 100px;
+        height: 150px;
     }
-    .msg-textarea{
+    .msg-textarea {
         outline: none;
         font-size: 22px;
         width: calc(100% - 80px);
         word-break: break-all;
-        resize:none;
+        resize: none;
     }
-    .msg-out__button{
+    .msg-out__button {
         border: solid 1px black;
         border-radius: 2px;
         height: 20px;
         width: 50px;
-        margin: 5px 36px 5px auto ;
+        margin: 5px 36px 5px auto;
         background-color: rgb(245, 245, 245);
     }
-    .msg-out__button:hover{
+    .msg-out__button:hover {
         color: white;
         background-color: rgb(18, 150, 17);
     }
@@ -79,10 +91,15 @@
             </div>
         </div>
         <div class="msg-box">
-            <div class="msg">
+            <div class="msg-title">
+                {{ msgs[curname].name }}
+                <tool />
+            </div>
+            <div class="msg-body">
                 <div
                     v-for="(jitem, jindex) in msgs[curname].msgList"
-                    :key="jindex" class="msg-item"
+                    :key="jindex"
+                    class="msg-item"
                 >
                     <div v-if="jitem.pas">me:{{ jitem.contain }}</div>
                     <div v-else>
@@ -91,6 +108,9 @@
                 </div>
             </div>
             <div class="msg-in">
+                <div>
+                    <img src="../assets/file.svg" alt="" @click="getfile" />
+                </div>
                 <textarea
                     class="msg-textarea"
                     type="text-box"
@@ -104,8 +124,18 @@
 </template>
 
 <script>
+    import tool from "./tool";
+    import { ipcRenderer } from "electron";
     export default {
         name: "chartview",
+        components: {
+            tool,
+        },
+        methods: {
+            getfile() {
+                ipcRenderer.send("getlocalfile");
+            },
+        },
         data() {
             return {
                 curname: 0,
