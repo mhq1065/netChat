@@ -12,8 +12,11 @@
             </div>
         </section>
         <section class="right-section">
-            <chartview v-if="toolSection === 'chat'" />
-            <login v-else-if="toolSection === 'setting'" />
+            <chartview v-if="toolSection === 'chat'" ref="child"/>
+            <login
+                v-else-if="toolSection === 'setting'"
+                @loginInit="loginInit"
+            />
         </section>
     </div>
 </template>
@@ -40,7 +43,16 @@
         data() {
             return {
                 toolSection: "chat",
+                ws: {},
+                
             };
+        },
+        methods: {
+            loginInit() {
+                console.log("log in successfully");
+                console.log("start get infomation ... ");
+                this.$refs.child.init()
+            },
         },
     };
 </script>

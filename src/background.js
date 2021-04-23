@@ -1,10 +1,13 @@
 import { app, protocol, BrowserWindow } from "electron";
 import { createProtocol } from "vue-cli-plugin-electron-builder/lib";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
-const isDevelopment = process.env.NODE_ENV !== "production";
 let ipcMain = require("electron").ipcMain;
 const { dialog } = require("electron");
+const Store = require('electron-store');
 
+Store.initRenderer();
+
+const isDevelopment = process.env.NODE_ENV !== "production";
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
     { scheme: "app", privileges: { secure: true, standard: true } },
@@ -21,16 +24,17 @@ async function createWindow() {
             // Use pluginOptions.nodeIntegration, leave this alone
             // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info
             nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
+            enableRemoteModule: true
             // nodeIntegration: true,
         },
     });
     // 接收进程间通信
     //接收最小化命令
-    ipcMain.on("window-min", function() {
+    ipcMain.on("window-min", function () {
         win.minimize();
     });
     //接收最大化命令
-    ipcMain.on("window-max", function() {
+    ipcMain.on("window-max", function () {
         if (win.isMaximized()) {
             win.restore();
         } else {
@@ -38,12 +42,12 @@ async function createWindow() {
         }
     });
     //接收关闭命令
-    ipcMain.on("window-close", function() {
+    ipcMain.on("window-close", function () {
         win.close();
     });
     //接受获取文件命令
 
-    ipcMain.on("getlocalfile", function(event, arg) {
+    ipcMain.on("getlocalfile", function (event, arg) {
         win.focus();
         const res = dialog.showOpenDialogSync({
             title: "对话框窗口的标题",
@@ -61,7 +65,7 @@ async function createWindow() {
             properties: ["showHiddenFiles"],
             message: "mac文件选择器title",
         });
-        event.sender.send('getlocalfile-reply', res) 
+        event.sender.send('getlocalfile-reply', res)
     });
 
     if (process.env.WEBPACK_DEV_SERVER_URL) {
@@ -83,6 +87,8 @@ app.on("window-all-closed", () => {
         app.quit();
     }
 });
+app.commandLine.appendSwitch('disable-features','OutOfBlinkCors');
+
 
 app.on("activate", () => {
     // On macOS it's common to re-create a window in the app when the
