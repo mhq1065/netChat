@@ -6,7 +6,7 @@
     }
     /* 好友列表 */
     .chat-friends {
-        flex-grow: 1;
+        width: 230px;
         background-color: rgb(240, 240, 240);
     }
     .chat-friends__item {
@@ -26,7 +26,6 @@
     .msg-box {
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
         flex-grow: 1;
     }
     .msg-title {
@@ -39,41 +38,13 @@
         background-color: rgb(245, 245, 245);
         border-bottom: 1px solid rgb(231, 231, 231);
     }
-    .msg-body {
-        height: 200px;
-        overflow: auto;
+    .msg-type {
+        height: 50px;
+        display: flex;
+        flex-direction: row;
+    }
+    .msg-content {
         flex-grow: 1;
-        padding: 0 38px;
-        background-color: rgb(245, 245, 245);
-        text-align: left;
-    }
-    .msg-item {
-        height: 30px;
-    }
-    .msg-in {
-        margin: 5px 0;
-        width: 100%;
-        height: 150px;
-    }
-    .msg-textarea {
-        outline: none;
-        font-size: 22px;
-        width: calc(100% - 80px);
-        word-break: break-all;
-        resize: none;
-    }
-    .msg-out__button {
-        cursor: pointer;
-        border: solid 1px black;
-        border-radius: 2px;
-        height: 20px;
-        width: 50px;
-        margin: 5px 36px 5px auto;
-        background-color: rgb(245, 245, 245);
-    }
-    .msg-out__button:hover {
-        color: white;
-        background-color: rgb(18, 150, 17);
     }
     /* switch */
     .switch {
@@ -148,38 +119,31 @@
                 </div>
             </div>
         </div>
-        <div class="msg-box">
+        <div class="msg-box" v-if="curname !== null">
             <div class="msg-title">
                 {{ msgs[curname].name }}
                 <tool />
             </div>
-            <div class="msg-body">
-                <div
-                    v-for="(jitem, jindex) in msgs[curname].msgList"
-                    :key="jindex"
-                    class="msg-item"
-                >
-                    <div v-if="jitem.pas">me:{{ jitem.contain }}</div>
-                    <div v-else>
-                        {{ msgs[curname].name }}:{{ jitem.contain }}
-                    </div>
-                </div>
+            <div class="msg-type">
+                <div @click="content = 'chat'">聊天</div>
+                |
+                <div @click="content = 'video'">视频</div>
+                |
+                <div>文件</div>
             </div>
-            <div class="msg-in">
-                <div>
-                    <img src="../assets/file.svg" alt="" @click="getfile" />
-                    <label class="switch">
-                        <input type="checkbox" v-model="p2pchecked" />
-                        <div class="slider round"></div>
-                    </label>
-                </div>
-                <textarea
-                    class="msg-textarea"
-                    type="text-box"
-                    rows="3"
-                    v-model="msgs[curname].input"
+            <div class="msg-content">
+                <chatbox
+                    v-show="content === 'chat'"
+                    v-bind:msgs="msgs[curname]"
+                    @sendmsg="sendmsg"
                 />
-                <div class="msg-out__button" @click="sendmsg">enter</div>
+                <videobox
+                    v-show="content === 'video'"
+                    v-bind:msgs="msgs[curname]"
+                    v-bind:myClientId="myClientId"
+                    ref="videobox"
+                    @createPeer="createPeer"
+                />
             </div>
         </div>
     </div>
@@ -188,29 +152,192 @@
 <script>
     import tool from "./tool";
     import { ipcRenderer } from "electron";
-
+    import chatbox from "./chatbox";
+    import videobox from "./videobox";
+    var SimplePeer = require("simple-peer");
     export default {
         name: "chartview",
         components: {
             tool,
+            chatbox,
+            videobox,
         },
         mounted() {},
         methods: {
             getfile() {
                 ipcRenderer.send("getlocalfile");
             },
-            sendmsg() {
+            // 创建视频p2p链接
+            createPeer(stream) {
+                console.log();
+                this.msgs[this.curname].peer = new SimplePeer({
+                    initiator: true,
+                    config: this.p2pconfig,
+                    stream: stream,
+                });
+                let peer = this.msgs[this.curname].peer;
+                peer.on("signal", (data) => {
+                    console.log("SIGNAL", JSON.stringify(data));
+                    this.sendbyWs({
+                        type: "connect",
+                        from: this.myClientId,
+                        target: this.msgs[this.curname].clientID,
+                        data: JSON.stringify(data),
+                    });
+                });
+                peer.on("data", (data) => {
+                    console.log("data: " + data);
+                });
+                peer.on("connect", () => {
+                    console.log("CONNECT");
+                    peer.send("whatever" + Math.random());
+                });
+            },
+            // 接受视频p2p请求
+            revieve(id, data) {
+                this.msgs[id].peer2 = new SimplePeer({
+                    config: this.p2pconfig,
+                });
+                let peer = this.msgs[id].peer2;
+                peer.signal(JSON.parse(data));
+                peer.on("data", (data) => {
+                    console.log("data: " + data);
+                });
+                peer.on("signal", (data) => {
+                    console.log("SIGNAL", JSON.stringify(data));
+                    this.sendbyWs({
+                        type: "connect response",
+                        from: this.myClientId,
+                        target: this.msgs[id].clientID,
+                        data: JSON.stringify(data),
+                    });
+                });
+                peer.on("stream", (stream) => {
+                    this.$refs.videobox.initstream(stream);
+                });
+            },
+            revieve2(id, data) {
+                this.msgs[id].peer.signal(JSON.parse(data));
+            },
+            sendbyWs(JSONmsg) {
+                this.websocket.send(JSON.stringify(JSONmsg));
+            },
+            sendmsg(msg) {
+                console.log(msg);
                 let t = this.msgs[this.curname];
                 console.log(`send:${t.input} to:${t.name}`);
-                // this.msgsocket.send(t.input);
-                // t.msgList.push({
-                //     time: Date(),
-                //     contain: t.input,
-                //     pas: true,
-                // });
+                t.msgList.push({
+                    time: Date(),
+                    text: t.input,
+                    target: t.clientID,
+                    pas: true,
+                });
+                this.websocket.send(
+                    JSON.stringify({
+                        type: "message",
+                        time: Date(),
+                        from: this.myClientId,
+                        target: t.clientID,
+                        text: t.input,
+                    })
+                );
             },
             init() {
-                console.log("start init")
+                console.log("start init");
+                this.websocket = new WebSocket("ws://192.168.1.109:6503");
+                let ws = this.websocket;
+                window.ws = this.websocket;
+                ws.onopen = () => {
+                    ws.send(
+                        JSON.stringify({
+                            type: "init",
+                            name: "hello",
+                            clientID: this.myClientId,
+                        })
+                    );
+                    ws.send(
+                        JSON.stringify({
+                            type: "getUserlist",
+                        })
+                    );
+                };
+                ws.onmessage = (event) => {
+                    let msg = JSON.parse(event.data);
+                    console.log("Message from server ", msg);
+                    switch (msg.type) {
+                        case "Userlist":
+                            console.log("recieve userlist");
+                            this.msgs = msg.data.map((i) => {
+                                i.msgList = [];
+                                i.input = "";
+                                return i;
+                            });
+                            console.log(this.msgs);
+                            this.curname = 0;
+                            break;
+                        case "message":
+                            console.log("recieve message");
+                            for (let i = 0; i < this.msgs.length; i++) {
+                                if (this.msgs[i].clientID == msg.from) {
+                                    this.msgs[i].msgList.push({
+                                        time: msg.time,
+                                        text: msg.text,
+                                        pas: false,
+                                    });
+                                    break;
+                                }
+                            }
+                            break;
+                        case "connect response":
+                            console.log("recieve connect response");
+                            for (let i = 0; i < this.msgs.length; i++) {
+                                if (this.msgs[i].clientID == msg.from) {
+                                    this.revieve2(i, msg.data);
+                                    // this.msgs[i].peer.signal(
+                                    //     JSON.parse(msg.data)
+                                    // );
+                                    break;
+                                }
+                            }
+                            break;
+                        case "connect":
+                            console.log("recieve connection");
+                            for (let i = 0; i < this.msgs.length; i++) {
+                                if (this.msgs[i].clientID == msg.from) {
+                                    this.revieve(i, msg.data);
+                                    // this.msgs[i].peer2 = new SimplePeer({
+                                    //     trickle: false,
+                                    //     config: this.p2pconfig,
+                                    // });
+                                    // this.msgs[i].peer2.signal(
+                                    //     JSON.parse(msg.data)
+                                    // );
+                                    // this.msgs[i].peer2.on("data", (data) => {
+                                    //     console.log("data: " + data);
+                                    // });
+                                    // this.msgs[i].peer2.on("signal", (data) => {
+                                    //     console.log(
+                                    //         "SIGNAL",
+                                    //         JSON.stringify(data)
+                                    //     );
+                                    //     this.websocket.send(
+                                    //         JSON.stringify({
+                                    //             type: "connect response",
+                                    //             from: this.myClientId,
+                                    //             target: msg.from,
+                                    //             data: JSON.stringify(data),
+                                    //         })
+                                    //     );
+                                    // });
+                                    break;
+                                }
+                            }
+
+                            break;
+                        default:
+                            break;
+                    }
+                };
             },
         },
         watch: {
@@ -221,37 +348,23 @@
         data() {
             return {
                 p2pchecked: false,
-                curname: 0,
-                msgsocket: {},
-                msgs: [
-                    {
-                        name: "lihua",
-                        msgList: [
-                            {
-                                time: "1999",
-                                contain: "hello",
-                                pas: true,
-                            },
-                        ],
-                        input: "",
-                    },
-                    {
-                        name: "小红",
-                        msgList: [
-                            {
-                                time: "1999",
-                                contain: "hello",
-                                pas: true,
-                            },
-                            {
-                                time: "1999",
-                                contain: "hello",
-                                pas: false,
-                            },
-                        ],
-                        input: "",
-                    },
-                ],
+                curname: null,
+                websocket: null,
+                myClientId: 100,
+                msgs: [],
+                content: "chat",
+                p2pconfig: {
+                    iceServers: [
+                        {
+                            urls: "stun:hwc.l2d.top:3478",
+                        },
+                        {
+                            urls: "turn:hwc.l2d.top:3478", // A TURN server
+                            username: "test",
+                            credential: "123456",
+                        },
+                    ],
+                },
             };
         },
     };

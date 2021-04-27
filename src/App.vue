@@ -12,9 +12,9 @@
             </div>
         </section>
         <section class="right-section">
-            <chartview v-if="toolSection === 'chat'" ref="child"/>
+            <chartview v-show="toolSection === 'chat'" ref="child" />
             <login
-                v-else-if="toolSection === 'setting'"
+                v-show="toolSection === 'setting'"
                 @loginInit="loginInit"
             />
         </section>
@@ -44,14 +44,16 @@
             return {
                 toolSection: "chat",
                 ws: {},
-                
             };
         },
         methods: {
             loginInit() {
                 console.log("log in successfully");
                 console.log("start get infomation ... ");
-                this.$refs.child.init()
+                this.$nextTick().then(() => {
+                    console.log(this.$refs);
+                    this.$refs.child.init();
+                });
             },
         },
     };
