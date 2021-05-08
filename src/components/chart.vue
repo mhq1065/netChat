@@ -6,7 +6,7 @@
     }
     /* 好友列表 */
     .chat-friends {
-        width: 230px;
+        flex: 0 0 200px;
         background-color: rgb(240, 240, 240);
     }
     .chat-friends__item {
@@ -22,11 +22,11 @@
     .friends__item_unchoosen {
         background-color: rgb(240, 240, 240);
     }
-    /* 聊天 */
+    /* 聊天视频框 */
     .msg-box {
         display: flex;
         flex-direction: column;
-        flex-grow: 1;
+        flex: 1;
     }
     .msg-title {
         height: 20px;
@@ -38,13 +38,31 @@
         background-color: rgb(245, 245, 245);
         border-bottom: 1px solid rgb(231, 231, 231);
     }
+    /* 聊天视频内容 */
+    .msg-box_content {
+        display: flex;
+        flex-direction: row;
+        height: 100%;
+    }
+    /* 视频框 */
+    .msg-box_content__video {
+        flex: 0 100px;
+    }
+    /* 聊天框 */
+    .msg-box_content__msg {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-width: 300px;
+    }
     .msg-type {
         height: 50px;
         display: flex;
         flex-direction: row;
     }
     .msg-content {
-        flex-grow: 1;
+        flex: 1;
     }
     /* switch */
     .switch {
@@ -124,26 +142,32 @@
                 {{ msgs[curname].name }}
                 <tool />
             </div>
-            <div class="msg-type">
-                <div @click="content = 'chat'">聊天</div>
-                |
-                <div @click="content = 'video'">视频</div>
-                |
-                <div>文件</div>
-            </div>
-            <div class="msg-content">
-                <chatbox
-                    v-show="content === 'chat'"
-                    v-bind:msgs="msgs[curname]"
-                    @sendmsg="sendmsg"
-                />
-                <videobox
-                    v-show="content === 'video'"
-                    v-bind:msgs="msgs[curname]"
-                    v-bind:myClientId="myClientId"
-                    ref="videobox"
-                    @createPeer="createPeer"
-                />
+            <div class="msg-box_content">
+                <div class="msg-box_content__msg">
+                    <div class="msg-type">
+                        <div @click="content = 'chat'">聊天</div>
+                        |
+                        <div @click="content = 'file'">文件</div>
+                    </div>
+                    <div class="msg-content">
+                        <chatbox
+                            v-show="content === 'chat'"
+                            v-bind:msgs="msgs[curname]"
+                            @sendmsg="sendmsg"
+                            @createvideoPeer="createvideoPeer"
+                        />
+                    </div>
+                </div>
+                <div v-show="showvideo" class="msg-box_content__video">
+                    <video src="" id="video" width="240" height="160"></video>
+                    <video
+                        src=""
+                        id="peervideo"
+                        width="240"
+                        height="160"
+                    ></video>
+                    <button @click="closeVideoPeer">close</button>
+                </div>
             </div>
         </div>
     </div>
@@ -153,14 +177,12 @@
     import tool from "./tool";
     import { ipcRenderer } from "electron";
     import chatbox from "./chatbox";
-    import videobox from "./videobox";
     var SimplePeer = require("simple-peer");
     export default {
         name: "chartview",
         components: {
             tool,
             chatbox,
-            videobox,
         },
         mounted() {},
         methods: {
@@ -168,58 +190,126 @@
                 ipcRenderer.send("getlocalfile");
             },
             // 创建视频p2p链接
-            createPeer(stream) {
-                console.log();
-                this.msgs[this.curname].peer = new SimplePeer({
-                    initiator: true,
-                    config: this.p2pconfig,
-                    stream: stream,
-                });
-                let peer = this.msgs[this.curname].peer;
-                peer.on("signal", (data) => {
-                    console.log("SIGNAL", JSON.stringify(data));
-                    this.sendbyWs({
-                        type: "connect",
-                        from: this.myClientId,
-                        target: this.msgs[this.curname].clientID,
-                        data: JSON.stringify(data),
+            createvideoPeer() {
+                console.log("videobox init");
+                navigator.mediaDevices
+                    .getUserMedia({ video: { width: 240, height: 160 } })
+                    .then((stream) => {
+                        let video = document.getElementById("video");
+                        let peervideo = document.getElementById("peervideo");
+                        video.srcObject = stream;
+                        video.play();
+                        this.peer = new SimplePeer({
+                            initiator: true,
+                            config: this.p2pconfig,
+                            stream: stream,
+                        });
+                        let peer = this.peer;
+                        peer.on("signal", (data) => {
+                            console.log("SIGNAL", JSON.stringify(data));
+                            this.sendbyWs({
+                                type: "connect",
+                                from: this.myClientId,
+                                target: this.msgs[this.curname].clientID,
+                                data: JSON.stringify(data),
+                            });
+                        });
+                        peer.on("stream", (newStream) => {
+                            peervideo.srcObject = newStream;
+                            peervideo.play();
+                        });
+                        peer.on("error", (e) => {
+                            console.log("error", e);
+                            video.pause();
+                            video.srcObject
+                                .getTracks()
+                                .forEach((track) => track.stop());
+                            peer.destroy();
+                            this.showvideo = false;
+                        });
+                        peer.on("close", () => {
+                            // video.srcObject = "";
+                            video.pause();
+                            video.srcObject
+                                .getTracks()
+                                .forEach((track) => track.stop());
+                            this.showvideo = false;
+                        });
+                        this.showvideo = true;
                     });
-                });
-                peer.on("data", (data) => {
-                    console.log("data: " + data);
-                });
-                peer.on("connect", () => {
-                    console.log("CONNECT");
-                    peer.send("whatever" + Math.random());
-                });
             },
             // 接受视频p2p请求
             revieve(id, data) {
-                this.msgs[id].peer2 = new SimplePeer({
-                    config: this.p2pconfig,
-                });
-                let peer = this.msgs[id].peer2;
-                peer.signal(JSON.parse(data));
-                peer.on("data", (data) => {
-                    console.log("data: " + data);
-                });
-                peer.on("signal", (data) => {
-                    console.log("SIGNAL", JSON.stringify(data));
-                    this.sendbyWs({
-                        type: "connect response",
-                        from: this.myClientId,
-                        target: this.msgs[id].clientID,
-                        data: JSON.stringify(data),
+                let video = document.getElementById("peervideo");
+                let localvideo = document.getElementById("video");
+
+                navigator.mediaDevices
+                    .getUserMedia({ video: { width: 240, height: 160 } })
+                    .then((stream) => {
+                        this.peer2 = new SimplePeer({
+                            config: this.p2pconfig,
+                            stream: stream,
+                        });
+                        let peer = this.peer2;
+                        localvideo.srcObject = stream;
+                        localvideo.play();
+                        peer.signal(JSON.parse(data));
+                        peer.on("signal", (data) => {
+                            console.log("SIGNAL", JSON.stringify(data));
+                            this.sendbyWs({
+                                type: "connect response",
+                                from: this.myClientId,
+                                target: this.msgs[id].clientID,
+                                data: JSON.stringify(data),
+                            });
+                        });
+                        peer.on("stream", (stream) => {
+                            video.srcObject = stream;
+                            video.play();
+                        });
+                        peer.on("error", (e) => {
+                            console.log("error", e);
+                            localvideo.pause();
+                            localvideo.srcObject
+                                .getTracks()
+                                .forEach((track) => track.stop());
+                            peer.destroy();
+                            peer = null;
+                            this.showvideo = false;
+                        });
+                        peer.on("close", () => {
+                            localvideo.pause();
+                            localvideo.srcObject
+                                .getTracks()
+                                .forEach((track) => track.stop());
+
+                            this.showvideo = false;
+                        });
+                        this.showvideo = true;
                     });
-                });
-                peer.on("stream", (stream) => {
-                    this.$refs.videobox.initstream(stream);
-                });
             },
+            // 发起方接受请求
             revieve2(id, data) {
-                this.msgs[id].peer.signal(JSON.parse(data));
+                this.peer.signal(JSON.parse(data));
             },
+            closeVideoPeer() {
+                let localvideo = document.getElementById("video");
+                localvideo.pause();
+                localvideo.srcObject
+                    .getTracks()
+                    .forEach((track) => track.stop());
+                if (this.peer) {
+                    this.peer.destroy();
+                    this.peer = null;
+                } else {
+                    this.peer2.destroy();
+                    this.peer2 = null;
+                }
+                this.showvideo = false;
+            },
+
             sendbyWs(JSONmsg) {
+                console.log("sendby ws", JSONmsg);
                 this.websocket.send(JSON.stringify(JSONmsg));
             },
             sendmsg(msg) {
@@ -251,7 +341,7 @@
                     ws.send(
                         JSON.stringify({
                             type: "init",
-                            name: "hello",
+                            name: this.myClientName,
                             clientID: this.myClientId,
                         })
                     );
@@ -289,13 +379,10 @@
                             }
                             break;
                         case "connect response":
-                            console.log("recieve connect response");
+                            console.log("recieve connect response", msg.data);
                             for (let i = 0; i < this.msgs.length; i++) {
                                 if (this.msgs[i].clientID == msg.from) {
                                     this.revieve2(i, msg.data);
-                                    // this.msgs[i].peer.signal(
-                                    //     JSON.parse(msg.data)
-                                    // );
                                     break;
                                 }
                             }
@@ -305,30 +392,6 @@
                             for (let i = 0; i < this.msgs.length; i++) {
                                 if (this.msgs[i].clientID == msg.from) {
                                     this.revieve(i, msg.data);
-                                    // this.msgs[i].peer2 = new SimplePeer({
-                                    //     trickle: false,
-                                    //     config: this.p2pconfig,
-                                    // });
-                                    // this.msgs[i].peer2.signal(
-                                    //     JSON.parse(msg.data)
-                                    // );
-                                    // this.msgs[i].peer2.on("data", (data) => {
-                                    //     console.log("data: " + data);
-                                    // });
-                                    // this.msgs[i].peer2.on("signal", (data) => {
-                                    //     console.log(
-                                    //         "SIGNAL",
-                                    //         JSON.stringify(data)
-                                    //     );
-                                    //     this.websocket.send(
-                                    //         JSON.stringify({
-                                    //             type: "connect response",
-                                    //             from: this.myClientId,
-                                    //             target: msg.from,
-                                    //             data: JSON.stringify(data),
-                                    //         })
-                                    //     );
-                                    // });
                                     break;
                                 }
                             }
@@ -350,8 +413,12 @@
                 p2pchecked: false,
                 curname: null,
                 websocket: null,
+                myClientName: "Jack",
                 myClientId: 100,
+                showvideo: false,
                 msgs: [],
+                peer: null,
+                peer2: null,
                 content: "chat",
                 p2pconfig: {
                     iceServers: [

@@ -13,10 +13,7 @@
         </section>
         <section class="right-section">
             <chartview v-show="toolSection === 'chat'" ref="child" />
-            <login
-                v-show="toolSection === 'setting'"
-                @loginInit="loginInit"
-            />
+            <login v-show="toolSection === 'setting'" @loginInit="loginInit" />
         </section>
     </div>
 </template>
@@ -80,7 +77,7 @@
     }
     .left-section {
         padding: 30px 0;
-        width: 60px;
+        flex: 0 0 60px;
         background-color: rgb(39, 42, 45);
     }
     .left-section > div {

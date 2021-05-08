@@ -13,9 +13,9 @@
         height: 30px;
     }
     .msg-in {
-        margin: 20px 0;
+        padding: 10px 0;
         width: 100%;
-        height: 30%;
+        height: calc(30% - 24px);
     }
     .msg-textarea {
         outline: none;
@@ -55,14 +55,14 @@
             </div>
         </div>
         <div class="msg-in">
-            <!-- <div>
-                <img src="../assets/file.svg" alt="" @click="getfile" />
-                <img src="../assets/video.svg" alt="" @click="communicate" />
-                <label class="switch">
+            <div>
+                <img src="../assets/file.svg" alt="" />
+                <img src="../assets/video.svg" alt="" @click="ask"/>
+                <!-- <label class="switch">
                     <input type="checkbox" v-model="p2pchecked" />
                     <div class="slider round"></div>
-                </label>
-            </div> -->
+                </label> -->
+            </div>
             <textarea
                 class="msg-textarea"
                 type="text-box"
@@ -81,6 +81,9 @@
             sendmsg() {
                 this.$emit("sendmsg", this.msgs.input);
             },
+            ask(){
+                this.$emit("createvideoPeer");
+            }
         },
     };
 </script>

@@ -1,7 +1,7 @@
 <style>
     .login-body {
         -webkit-app-region: drag;
-        height: 100%;
+        height: 30%;
     }
     input,
     button {
@@ -26,6 +26,7 @@
             密码
             <input type="password" name="pwd" id="pwd" v-model="pwd" />
         </label>
+        <br />
         <label for="rememberme">
             <input
                 type="checkbox"
@@ -56,8 +57,6 @@
                 console.log(store.get("username"));
                 console.log(this.rememberme, store.get("rememberme"));
             }
-
-
         },
         data() {
             return {
