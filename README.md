@@ -22,3 +22,11 @@ yarn lint
 
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
+
+
+删除了axios源码中的package.json
+```
+"browser": {
+    "./lib/adapters/http.js": "./lib/adapters/xhr.js"
+  },
+```

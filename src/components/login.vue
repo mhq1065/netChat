@@ -43,7 +43,8 @@
     import tool from "./tool";
     import Store from "electron-store";
     const store = new Store();
-    // import axios from "../axios";
+    // const { net } = require("electron").remote;
+    import axios from "../axios";
     export default {
         name: "login",
         components: {
@@ -91,25 +92,31 @@
                 //     JSON.stringify({ type: "name", id: this.id, name: "hello" })
                 // );
 
-                // axios({
-                //     method: "post",
-                //     url: "/Test",
-                //     headers: {
-                //         // 这里要将content-type改成这种提交form表单时使用的格式
-                //         "Content-Type": "application/json;charset=UTF-8",
-                //     },
-                //     data: {
-                //         username: this.username,
-                //         password: this.pwd,
-                //     },
-                // })
-                //     .then((res) => {
-                //         console.log(res.data);
-                this.$emit("loginInit");
-                //     })
-                //     .catch((err) => {
-                //         console.log(err);
-                //     });
+                axios({
+                    method: "POST",
+                    url: "/login",
+                    headers: {
+                        // 这里要将content-type改成这种提交form表单时使用的格式
+                        "Content-Type": "application/json;charset=UTF-8",
+                    },
+                    data: {
+                        id: this.username,
+                        psw: this.pwd,
+                    },
+                })
+                    .then((res) => {
+                        if (res.data.res === "OK") {
+                            localStorage.setItem('id', this.id);
+                            localStorage.setItem('sid', res.data.id);
+                            localStorage.setItem('name', res.data.name);
+                            this.$emit("loginInit");
+                        } else {
+                            console.log(res.data);
+                        }
+                    })
+                    .catch((err) => {
+                        console.log(err);
+                    });
             },
         },
     };

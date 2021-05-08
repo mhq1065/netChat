@@ -178,6 +178,10 @@
     import { ipcRenderer } from "electron";
     import chatbox from "./chatbox";
     var SimplePeer = require("simple-peer");
+    import Store from "electron-store";
+    const store = new Store();
+    import axios from "../axios";
+
     export default {
         name: "chartview",
         components: {
@@ -209,9 +213,9 @@
                             console.log("SIGNAL", JSON.stringify(data));
                             this.sendbyWs({
                                 type: "connect",
-                                from: this.myClientId,
-                                target: this.msgs[this.curname].clientID,
-                                data: JSON.stringify(data),
+                                from: this.id,
+                                to: this.msgs[this.curname].frid,
+                                sdp: JSON.stringify(data),
                             });
                         });
                         peer.on("stream", (newStream) => {
@@ -253,16 +257,16 @@
                         let peer = this.peer2;
                         localvideo.srcObject = stream;
                         localvideo.play();
-                        peer.signal(JSON.parse(data));
                         peer.on("signal", (data) => {
                             console.log("SIGNAL", JSON.stringify(data));
                             this.sendbyWs({
                                 type: "connect response",
-                                from: this.myClientId,
-                                target: this.msgs[id].clientID,
-                                data: JSON.stringify(data),
+                                from: this.id,
+                                to: this.msgs[id].frid,
+                                sdp: JSON.stringify(data),
                             });
                         });
+                        peer.signal(JSON.parse(data));
                         peer.on("stream", (stream) => {
                             video.srcObject = stream;
                             video.play();
@@ -313,48 +317,112 @@
                 this.websocket.send(JSON.stringify(JSONmsg));
             },
             sendmsg(msg) {
+                // 未完成
                 console.log(msg);
                 let t = this.msgs[this.curname];
                 console.log(`send:${t.input} to:${t.name}`);
-                t.msgList.push({
-                    time: Date(),
-                    text: t.input,
-                    target: t.clientID,
-                    pas: true,
-                });
+                t.msgList.push({});
                 this.websocket.send(
                     JSON.stringify({
-                        type: "message",
-                        time: Date(),
-                        from: this.myClientId,
-                        target: t.clientID,
-                        text: t.input,
+                        op: "msg",
+                        // 会话号
+                        conv_id: t.conv_id,
+                        // 发送消息的用户的uid
+                        sender: this.id,
+                        // 发送消息的时间
+                        time: Date().toString(),
+                        // 消息类型
+                        type: "text",
+                        // 消息内容
+                        content: t.input,
                     })
                 );
             },
             init() {
                 console.log("start init");
-                this.websocket = new WebSocket("ws://192.168.1.109:6503");
+                this.id = localStorage.getItem("id");
+                this.sid = localStorage.getItem("sid");
+                this.name = localStorage.getItem("name");
+                this.websocket = new WebSocket("ws://114.116.234.101:43852");
                 let ws = this.websocket;
                 window.ws = this.websocket;
+                let userlist = store.get("userlist");
+                if (!userlist) {
+                    userlist = [];
+                    store.set("userlist", []);
+                }
+
+                this.msgs = userlist;
                 ws.onopen = () => {
                     ws.send(
                         JSON.stringify({
-                            type: "init",
-                            name: this.myClientName,
-                            clientID: this.myClientId,
-                        })
-                    );
-                    ws.send(
-                        JSON.stringify({
-                            type: "getUserlist",
+                            op: "login",
+                            seq: 0,
+                            sid: localStorage.getItem("sid"),
                         })
                     );
                 };
                 ws.onmessage = (event) => {
                     let msg = JSON.parse(event.data);
                     console.log("Message from server ", msg);
-                    switch (msg.type) {
+                    switch (msg.op) {
+                        case "login":
+                            if (msg.res === "OK") {
+                                console.log("login ok");
+                            } else {
+                                console.log("login error");
+                            }
+                            break;
+                        case "friend request":
+                            userlist = store.get("userlist");
+                            // 发送回复
+                            axios({
+                                method: "POST",
+                                url: "/resfriend",
+                                headers: {
+                                    // 这里要将content-type改成这种提交form表单时使用的格式
+                                    "Content-Type":
+                                        "application/json;charset=UTF-8",
+                                },
+                                data: {
+                                    sid: this.sid,
+                                    // A的uid
+                                    frid: msg.frid,
+                                    ans: "accept",
+                                },
+                            }).then((res) => {
+                                console.log("服务器成功收到好友请求", res.data);
+                                userlist.push({
+                                    frid: msg.frid,
+                                    name: msg.name,
+                                    conv_id: res.data.conv_id,
+                                    msgList: [],
+                                });
+                                store.set("userlist", userlist);
+                                this.msgs.push({
+                                    frid: msg.frid,
+                                    name: msg.name,
+                                    conv_id: res.data.conv_id,
+                                    msgList: [],
+                                });
+                            });
+                            break;
+                        case "friend answer":
+                            userlist = store.get("userlist");
+                            userlist.push({
+                                frid: msg.frid,
+                                name: msg.name,
+                                conv_id: msg.conv_id,
+                                msgList: [],
+                            });
+                            store.set("userlist", userlist);
+                            this.msgs.push({
+                                frid: msg.frid,
+                                name: msg.name,
+                                conv_id: msg.conv_id,
+                                msgList: [],
+                            });
+                            break;
                         case "Userlist":
                             console.log("recieve userlist");
                             this.msgs = msg.data.map((i) => {
@@ -365,13 +433,13 @@
                             console.log(this.msgs);
                             this.curname = 0;
                             break;
-                        case "message":
+                        case "msg":
                             console.log("recieve message");
                             for (let i = 0; i < this.msgs.length; i++) {
-                                if (this.msgs[i].clientID == msg.from) {
+                                if (this.msgs[i].conv_id == msg.conv_id) {
                                     this.msgs[i].msgList.push({
                                         time: msg.time,
-                                        text: msg.text,
+                                        text: msg.content,
                                         pas: false,
                                     });
                                     break;
@@ -381,8 +449,8 @@
                         case "connect response":
                             console.log("recieve connect response", msg.data);
                             for (let i = 0; i < this.msgs.length; i++) {
-                                if (this.msgs[i].clientID == msg.from) {
-                                    this.revieve2(i, msg.data);
+                                if (this.msgs[i].from == msg.from) {
+                                    this.revieve2(i, msg.sdp);
                                     break;
                                 }
                             }
@@ -390,8 +458,8 @@
                         case "connect":
                             console.log("recieve connection");
                             for (let i = 0; i < this.msgs.length; i++) {
-                                if (this.msgs[i].clientID == msg.from) {
-                                    this.revieve(i, msg.data);
+                                if (this.msgs[i].frid == msg.from) {
+                                    this.revieve(i, msg.sdp);
                                     break;
                                 }
                             }
@@ -413,8 +481,9 @@
                 p2pchecked: false,
                 curname: null,
                 websocket: null,
-                myClientName: "Jack",
-                myClientId: 100,
+                name: "Jack",
+                sid: 100,
+                id: "",
                 showvideo: false,
                 msgs: [],
                 peer: null,
