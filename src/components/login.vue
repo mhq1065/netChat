@@ -14,12 +14,12 @@
             <tool />
         </div>
         <label for="username">
-            用户名
+            ID
             <input
-                type="text"
+                type="number"
                 name="username"
                 id="username"
-                v-model="username"
+                v-model.number="username"
             />
         </label>
         <label for="pwd">
@@ -36,36 +36,29 @@
             />
         </label>
         <button @click="login">登录</button>
+        <div>{{ msg }}</div>
         <!-- <video id="video" width="480" height="320" controls></video> -->
     </div>
 </template>
 <script>
     import tool from "./tool";
-    import Store from "electron-store";
-    const store = new Store();
-    // const { net } = require("electron").remote;
-    import axios from "../axios";
+    const { net } = require("electron").remote;
+    import { HOST } from "../config";
+
+    // import axios from "../axios";
     export default {
         name: "login",
         components: {
             tool,
         },
-        mounted() {
-            if (store.get("username")) {
-                this.username = store.get("username");
-                this.pwd = store.get("pwd");
-                this.rememberme = store.get("rememberme");
-                console.log(store.get("username"));
-                console.log(this.rememberme, store.get("rememberme"));
-            }
-        },
         data() {
             return {
-                username: "",
-                pwd: "",
+                username: 2,
+                pwd: "lch",
                 rememberme: false,
                 websocket: null,
                 id: "",
+                msg: "",
             };
         },
         methods: {
@@ -74,49 +67,75 @@
                     alert("用户名密码不能为空");
                     return;
                 }
-                if (this.rememberme) {
-                    store.set({
-                        username: this.username,
-                        pwd: this.pwd,
-                        rememberme: this.rememberme,
-                    });
-                    console.log(store.get("username"));
-                } else {
-                    store.set({
-                        username: "",
-                        pwd: "",
-                    });
-                }
 
                 // this.websocket.send(
                 //     JSON.stringify({ type: "name", id: this.id, name: "hello" })
                 // );
-
-                axios({
+                console.log({
+                    id: +this.username,
+                    psw: this.pwd,
+                });
+                localStorage.setItem("id", +this.username);
+                const request = net.request({
                     method: "POST",
-                    url: "/login",
-                    headers: {
-                        // 这里要将content-type改成这种提交form表单时使用的格式
-                        "Content-Type": "application/json;charset=UTF-8",
-                    },
-                    data: {
-                        id: this.username,
-                        psw: this.pwd,
-                    },
-                })
-                    .then((res) => {
-                        if (res.data.res === "OK") {
-                            localStorage.setItem('id', this.id);
-                            localStorage.setItem('sid', res.data.id);
-                            localStorage.setItem('name', res.data.name);
+                    protocol: "http:",
+                    hostname: HOST,
+                    port: 43851,
+                    path: "/login",
+                });
+                request.on("response", (response) => {
+                    console.log(`STATUS: ${response.statusCode}`);
+                    console.log(`HEADERS: ${JSON.stringify(response.headers)}`);
+                    response.on("data", (chunk) => {
+                        let data = JSON.parse(chunk);
+                        console.log(`BODY: `, data);
+                        if (data.res == "OK") {
+                            localStorage.setItem("sid", data.sid);
+                            localStorage.setItem("name", data.name);
+                            this.msg = `welcome,${data.name}`;
                             this.$emit("loginInit");
                         } else {
-                            console.log(res.data);
+                            this.msg = `wrong id or password`;
                         }
-                    })
-                    .catch((err) => {
-                        console.log(err);
                     });
+                    response.on("end", () => {
+                        console.log("No more data in response.");
+                    });
+                });
+                request.write(
+                    JSON.stringify({
+                        id: +this.username,
+                        psw: this.pwd,
+                    })
+                );
+                request.end();
+
+                // axios({
+                //     method: "POST",
+                //     url: "http://114.116.234.101:43851/login",
+                //     headers: {
+                //         // 这里要将content-type改成这种提交form表单时使用的格式
+                //         "Content-Type": "application/json",
+                //     },
+                //     data: {
+                //         id: +this.username,
+                //         psw: this.pwd,
+                //     },
+                // })
+                //     .then((res) => {
+                //         console.log(res.data);
+                //         if (res.data.res === "OK") {
+                //             localStorage.setItem("id", this.id);
+                //             localStorage.setItem("sid", res.data.id);
+                //             localStorage.setItem("name", res.data.name);
+                //             this.$emit("loginInit");
+                //         } else {
+                //             console.log(res.data);
+                //         }
+                //     })
+                //     .catch((err) => {
+                //         console.log(err);
+                //     });
             },
         },
     };

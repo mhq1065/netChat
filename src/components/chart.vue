@@ -156,6 +156,7 @@
                             @sendmsg="sendmsg"
                             @createvideoPeer="createvideoPeer"
                         />
+                        <filebox v-show="content === 'file'" />
                     </div>
                 </div>
                 <div v-show="showvideo" class="msg-box_content__video">
@@ -175,18 +176,22 @@
 
 <script>
     import tool from "./tool";
+    import filebox from "./filebox";
     import { ipcRenderer } from "electron";
     import chatbox from "./chatbox";
     var SimplePeer = require("simple-peer");
     import Store from "electron-store";
     const store = new Store();
     import axios from "../axios";
+    const { net } = require("electron").remote;
+    import { HOST } from "../config";
 
     export default {
         name: "chartview",
         components: {
             tool,
             chatbox,
+            filebox,
         },
         mounted() {},
         methods: {
@@ -212,7 +217,7 @@
                         peer.on("signal", (data) => {
                             console.log("SIGNAL", JSON.stringify(data));
                             this.sendbyWs({
-                                type: "connect",
+                                op: "connect",
                                 from: this.id,
                                 to: this.msgs[this.curname].frid,
                                 sdp: JSON.stringify(data),
@@ -260,7 +265,7 @@
                         peer.on("signal", (data) => {
                             console.log("SIGNAL", JSON.stringify(data));
                             this.sendbyWs({
-                                type: "connect response",
+                                op: "connect response",
                                 from: this.id,
                                 to: this.msgs[id].frid,
                                 sdp: JSON.stringify(data),
@@ -294,6 +299,7 @@
             },
             // 发起方接受请求
             revieve2(id, data) {
+                console.log(data);
                 this.peer.signal(JSON.parse(data));
             },
             closeVideoPeer() {
@@ -321,7 +327,12 @@
                 console.log(msg);
                 let t = this.msgs[this.curname];
                 console.log(`send:${t.input} to:${t.name}`);
-                t.msgList.push({});
+                t.msgList.push({
+                    time: Date().toString(),
+                    type: "text",
+                    content: t.input,
+                    pas: true,
+                });
                 this.websocket.send(
                     JSON.stringify({
                         op: "msg",
@@ -340,19 +351,20 @@
             },
             init() {
                 console.log("start init");
-                this.id = localStorage.getItem("id");
+                this.id = Number(localStorage.getItem("id"));
                 this.sid = localStorage.getItem("sid");
                 this.name = localStorage.getItem("name");
-                this.websocket = new WebSocket("ws://114.116.234.101:43852");
+                this.websocket = new WebSocket(`ws://${HOST}:43852/msg`);
                 let ws = this.websocket;
                 window.ws = this.websocket;
-                let userlist = store.get("userlist");
-                if (!userlist) {
-                    userlist = [];
-                    store.set("userlist", []);
-                }
+                let userlist;
+                // userlist = store.get("userlist");
+                // if (!userlist) {
+                //     userlist = [];
+                //     store.set("userlist", []);
+                // }
 
-                this.msgs = userlist;
+                // this.msgs = userlist;
                 ws.onopen = () => {
                     ws.send(
                         JSON.stringify({
@@ -439,7 +451,7 @@
                                 if (this.msgs[i].conv_id == msg.conv_id) {
                                     this.msgs[i].msgList.push({
                                         time: msg.time,
-                                        text: msg.content,
+                                        content: msg.content,
                                         pas: false,
                                     });
                                     break;
@@ -449,7 +461,7 @@
                         case "connect response":
                             console.log("recieve connect response", msg.data);
                             for (let i = 0; i < this.msgs.length; i++) {
-                                if (this.msgs[i].from == msg.from) {
+                                if (this.msgs[i].frid == msg.from) {
                                     this.revieve2(i, msg.sdp);
                                     break;
                                 }
@@ -470,6 +482,41 @@
                     }
                 };
             },
+            addfriend() {
+                const request = net.request({
+                    method: "POST",
+                    protocol: "http:",
+                    hostname: HOST,
+                    port: 43851,
+                    path: "/addfriend",
+                });
+                request.on("response", (response) => {
+                    console.log(`STATUS: ${response.statusCode}`);
+                    console.log(`HEADERS: ${JSON.stringify(response.headers)}`);
+                    response.on("data", (chunk) => {
+                        let data = JSON.parse(chunk);
+                        console.log(`BODY: `, data);
+                        if (data.res == "OK") {
+                            localStorage.setItem("sid", data.sid);
+                            localStorage.setItem("name", data.name);
+                            this.msg = `welcome,${data.name}`;
+                            this.$emit("loginInit");
+                        } else {
+                            this.msg = `wrong id or password`;
+                        }
+                    });
+                    response.on("end", () => {
+                        console.log("No more data in response.");
+                    });
+                });
+                request.write(
+                    JSON.stringify({
+                        id: +this.username,
+                        psw: this.pwd,
+                    })
+                );
+                request.end();
+            },
         },
         watch: {
             p2pchecked: function(val) {
@@ -485,7 +532,14 @@
                 sid: 100,
                 id: "",
                 showvideo: false,
-                msgs: [],
+                msgs: [
+                    {
+                        frid: 2,
+                        name: "lch",
+                        conv_id: 2,
+                        msgList: [],
+                    },
+                ],
                 peer: null,
                 peer2: null,
                 content: "chat",

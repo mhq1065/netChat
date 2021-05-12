@@ -4,7 +4,7 @@
             <div @click="toolSection = 'chat'">
                 <img src="./assets/chat.svg" alt="" />
             </div>
-            <div @click="toolSection = 'file'">
+            <div @click="toolSection = 'addfriend'">
                 <img src="./assets/file2.svg" alt="" />
             </div>
             <div @click="toolSection = 'setting'">
@@ -14,6 +14,7 @@
         <section class="right-section">
             <chartview v-show="toolSection === 'chat'" ref="child" />
             <login v-show="toolSection === 'setting'" @loginInit="loginInit" />
+            <friend v-show="toolSection === 'addfriend'" @addfriend="addfriend"/>
         </section>
     </div>
 </template>
@@ -21,6 +22,7 @@
 <script>
     import chartview from "./components/chart";
     import login from "./components/login";
+    import friend from "./components/friend";
     import { ipcRenderer } from "electron";
 
     export default {
@@ -28,6 +30,7 @@
         components: {
             chartview,
             login,
+            friend,
         },
         mounted() {
             ipcRenderer.on("getlocalfile-reply", function(event, arg) {
@@ -52,6 +55,13 @@
                     this.$refs.child.init();
                 });
             },
+            addfriend(id){
+                console.log("ask to add friend");
+                this.$nextTick().then(() => {
+                    console.log(this.$refs);
+                    this.$refs.child.addfriend(id);
+                });
+            }
         },
     };
 </script>

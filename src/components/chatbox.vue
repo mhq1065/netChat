@@ -47,9 +47,9 @@
                     :key="jindex"
                     class="msg-item"
                 >
-                    <div v-if="jitem.pas === true">me:{{ jitem.text }}</div>
+                    <div v-if="jitem.pas === true">me:{{ jitem.content }}</div>
                     <div v-else-if="jitem.pas === false">
-                        {{ msgs.name }}:{{ jitem.text }}
+                        {{ msgs.name }}:{{ jitem.content }}
                     </div>
                 </div>
             </div>
