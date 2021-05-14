@@ -6,8 +6,16 @@
         <br />
         <button @click="sendFile" v-show="!file.send.start">send</button>
         <br v-show="!file.send.start" />
-        <button @click="changeState">{{ file.send.pause ? "继续" : "暂停" }}</button>
+        <button @click="changeState">
+            {{ file.send.pause ? "继续" : "暂停" }}
+        </button>
         <div>传输进度:{{ file.send.loading }}%</div>
+        <br />
+        <br />
+        <div v-for="(item, index) in file.recieve" :key="index">
+            <div>{{ item.filename }}</div>
+            <div>{{ ((item.start + 1) / (item.end + 1)).fix(2) }}</div>
+        </div>
     </div>
 </template>
 <script>
@@ -35,8 +43,7 @@
             },
         },
         data() {
-            return {
-            };
+            return {};
         },
     };
 </script>
