@@ -53,8 +53,8 @@
         },
         data() {
             return {
-                username: 2,
-                pwd: "lch",
+                username: 1,
+                pwd: "mhq",
                 rememberme: false,
                 websocket: null,
                 id: "",

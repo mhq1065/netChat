@@ -12,10 +12,13 @@
         <div>传输进度:{{ file.send.loading }}%</div>
         <br />
         <br />
-        <div v-for="(item, index) in file.recieve" :key="index">
-            <div>{{ item.filename }}</div>
-            <div>{{ ((item.start + 1) / (item.end + 1)).fix(2) }}</div>
-        </div>
+        <ul>
+            <li v-for="(item, index) in file.recieve" :key="index">
+                <span>{{ item.filename }}</span
+                >|
+                <span>{{ item.start + 1 }}/{{ item.end + 1 }}</span>
+            </li>
+        </ul>
     </div>
 </template>
 <script>
@@ -28,7 +31,7 @@
                 // 接收到Main进程返回的消息
                 const message = `异步消息回复: ${arg}`;
                 console.log(message);
-                this.$emit("sendfile", arg[0]);
+                this.filename = arg[0];
             });
         },
         methods: {
@@ -43,7 +46,9 @@
             },
         },
         data() {
-            return {};
+            return {
+                filename: "",
+            };
         },
     };
 </script>
