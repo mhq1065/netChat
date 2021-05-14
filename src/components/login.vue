@@ -44,8 +44,10 @@
     import tool from "./tool";
     const { net } = require("electron").remote;
     import { HOST } from "../config";
+    import Store from "electron-store";
+    const store = new Store();
 
-    // import axios from "../axios";
+
     export default {
         name: "login",
         components: {
@@ -54,12 +56,21 @@
         data() {
             return {
                 username: 1,
-                pwd: "mhq",
+                pwd: "",
                 rememberme: false,
                 websocket: null,
                 id: "",
                 msg: "",
             };
+        },
+        mounted() {
+            if (store.get("username")) {
+                this.username = store.get("username");
+                this.pwd = store.get("pwd");
+                this.rememberme = store.get("rememberme");
+                console.log(store.get("username"));
+                console.log(this.rememberme, store.get("rememberme"));
+            }
         },
         methods: {
             login() {
@@ -67,10 +78,19 @@
                     alert("用户名密码不能为空");
                     return;
                 }
-
-                // this.websocket.send(
-                //     JSON.stringify({ type: "name", id: this.id, name: "hello" })
-                // );
+                if (this.rememberme) {
+                    store.set({
+                        username: this.username,
+                        pwd: this.pwd,
+                        rememberme: this.rememberme,
+                    });
+                    console.log(store.get("username"));
+                } else {
+                    store.set({
+                        username: "",
+                        pwd: "",
+                    });
+                }
                 console.log({
                     id: +this.username,
                     psw: this.pwd,

@@ -460,35 +460,48 @@
                 let filews = this.filewebsocket;
                 let userlist;
                 // 获取会话列表
-                // const request = net.request({
-                //     method: "POST",
-                //     protocol: "http:",
-                //     hostname: HOST,
-                //     port: 43851,
-                //     path: "/convlist",
-                // });
-                // request.on("response", (response) => {
-                //     response.on("data", (chunk) => {
-                //         let data = JSON.parse(chunk);
-                //         console.log(`BODY: `, data);
-                //         if (data.res == "OK") {
-                //             this.msgs = data.friendlist.map((i) => {
-                //                 return {
-                //                     conv_id: i.conv_id,
-                //                     name: i.name,
-                //                 };
-                //             });
-                //         } else {
-                //             console.log("error", data);
-                //         }
-                //     });
-                // });
-                // request.write(
-                //     JSON.stringify({
-                //         sid: localStorage.getItem("sid"),
-                //     })
-                // );
-                // request.end();
+                const request = net.request({
+                    method: "POST",
+                    protocol: "http:",
+                    hostname: HOST,
+                    port: 43851,
+                    path: "/convlist",
+                });
+                request.on("response", (response) => {
+                    response.on("data", (chunk) => {
+                        let data = JSON.parse(chunk);
+                        console.log(`BODY: `, data);
+                        if (data.res == "OK") {
+                            this.msgs = data.convlist.map((i) => {
+                                return {
+                                    conv_id: i.conv_id,
+                                    name: i.name,
+                                    msgList: [],
+                                    file: {
+                                        send: {
+                                            pause: false,
+                                            filename: "",
+                                            loading: 0,
+                                            position: 0,
+                                            size: 1,
+                                            start: false,
+                                            fileInfo: {},
+                                        },
+                                        recieve: [],
+                                    },
+                                };
+                            });
+                        } else {
+                            console.log("error", data);
+                        }
+                    });
+                });
+                request.write(
+                    JSON.stringify({
+                        sid: localStorage.getItem("sid"),
+                    })
+                );
+                request.end();
                 // userlist = store.get("userlist");
                 // if (!userlist) {
                 //     userlist = [];
@@ -712,24 +725,24 @@
                 id: "",
                 showvideo: false,
                 msgs: [
-                    {
-                        frid: 2,
-                        name: "lch",
-                        conv_id: 2,
-                        msgList: [],
-                        file: {
-                            send: {
-                                pause: false,
-                                filename: "",
-                                loading: 0,
-                                position: 0,
-                                size: 1,
-                                start: false,
-                                fileInfo: {},
-                            },
-                            recieve: [],
-                        },
-                    },
+                    // {
+                    //     frid: 2,
+                    //     name: "name",
+                    //     conv_id: 2,
+                    //     msgList: [],
+                    //     file: {
+                    //         send: {
+                    //             pause: false,
+                    //             filename: "",
+                    //             loading: 0,
+                    //             position: 0,
+                    //             size: 1,
+                    //             start: false,
+                    //             fileInfo: {},
+                    //         },
+                    //         recieve: [],
+                    //     },
+                    // },
                 ],
                 peer: null,
                 peer2: null,
