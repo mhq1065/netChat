@@ -156,7 +156,13 @@
                             @sendmsg="sendmsg"
                             @createvideoPeer="createvideoPeer"
                         />
-                        <filebox v-show="content === 'file'" />
+                        <filebox
+                            v-show="content === 'file'"
+                            v-bind:files="msgs[curname].file"
+                            @sendfile="sendfile"
+                            @changeState="changeState"
+                            v-bind:conv_id="msgs[curname].conv_id"
+                        />
                     </div>
                 </div>
                 <div v-show="showvideo" class="msg-box_content__video">
@@ -180,11 +186,14 @@
     import { ipcRenderer } from "electron";
     import chatbox from "./chatbox";
     var SimplePeer = require("simple-peer");
+    const fs = require("fs");
+
     import Store from "electron-store";
     const store = new Store();
     import axios from "../axios";
     const { net } = require("electron").remote;
     import { HOST } from "../config";
+    const BUFFSIZE = 100000;
 
     export default {
         name: "chartview",
@@ -323,7 +332,6 @@
                 this.websocket.send(JSON.stringify(JSONmsg));
             },
             sendmsg(msg) {
-                // 未完成
                 console.log(msg);
                 let t = this.msgs[this.curname];
                 console.log(`send:${t.input} to:${t.name}`);
@@ -349,12 +357,98 @@
                     })
                 );
             },
+            sendfile(filename) {
+                console.log("start send file");
+                let p = this.msgs[this.curname];
+                let t = this.msgs[this.curname].file.send;
+                // 获取文件信息
+                let fileInfo = fs.statSync(filename);
+                t.fileInfo = fileInfo;
+                t.filename = filename;
+                console.log(`文件大小:${fileInfo.size}`);
+
+                // 获取文件传输websocket
+                let ws = this.filewebsocket;
+                var buf = new Buffer.alloc(BUFFSIZE);
+                let fd = fs.openSync(filename);
+                let readlength; // 读取的长度 字节
+                function sleep(time) {
+                    return new Promise((resolve) => setTimeout(resolve, time));
+                }
+                ws.onopen = async () => {
+                    t.start = true;
+                    ws.send(
+                        JSON.stringify({
+                            op: "start",
+                            conv_id: p.conv_id,
+                            name: filename,
+                            len: fileInfo.size,
+                            start: 0,
+                            end: Math.ceil(fileInfo.size / BUFFSIZE) - 1,
+                        })
+                    );
+                    do {
+                        // 读取position开始的数据
+                        // 返回读取的字节数
+                        readlength = fs.readSync(
+                            fd,
+                            buf,
+                            0,
+                            buf.length,
+                            t.position
+                        );
+                        if (readlength !== BUFFSIZE) {
+                            ws.send(buf.buffer.slice(0, readlength));
+                            t.position += readlength;
+                        } else {
+                            ws.send(buf.buffer);
+                            t.position += BUFFSIZE;
+                        }
+                        // update the loading Bar
+                        t.loading = (
+                            (100 * t.position) /
+                            t.fileInfo.size
+                        ).toFixed(2);
+                        await sleep(0);
+                        if (t.pause) {
+                            ws.send(
+                                JSON.stringify({
+                                    op: "pause",
+                                    conv_id: p.conv_id,
+                                    name: filename,
+                                })
+                            );
+                            while (t.pause) {
+                                await sleep(.3);
+                            }
+                            ws.send(
+                                JSON.stringify({
+                                    op: "start",
+                                    conv_id: p.conv_id,
+                                    name: filename,
+                                    len: fileInfo.size,
+                                    start: t.position / BUFFSIZE - 1,
+                                    end:
+                                        Math.ceil(fileInfo.size / BUFFSIZE) - 1,
+                                })
+                            );
+                        }
+                    } while (readlength === BUFFSIZE);
+                    fs.closeSync(fd);
+                };
+            },
+            changeState() {
+                console.log("changeState");
+                let t = this.msgs[this.curname].file.send;
+                t.pause = !t.pause;
+            },
             init() {
                 console.log("start init");
                 this.id = Number(localStorage.getItem("id"));
                 this.sid = localStorage.getItem("sid");
                 this.name = localStorage.getItem("name");
-                this.websocket = new WebSocket(`ws://${HOST}:43852/msg`);
+                this.websocket = new WebSocket(`ws://${HOST}:43852/file`);
+                this.filewebsocket = new WebSocket(`ws://${HOST}:43852/msg`);
                 let ws = this.websocket;
                 window.ws = this.websocket;
                 let userlist;
@@ -528,6 +622,7 @@
                 p2pchecked: false,
                 curname: null,
                 websocket: null,
+                filewebsocket: null,
                 name: "Jack",
                 sid: 100,
                 id: "",
@@ -538,6 +633,18 @@
                         name: "lch",
                         conv_id: 2,
                         msgList: [],
+                        file: {
+                            send: {
+                                pause: false,
+                                filename: "",
+                                loading: 0,
+                                position: 0,
+                                size: 1,
+                                start: false,
+                                fileInfo: {},
+                            },
+                            revieve: {},
+                        },
                     },
                 ],
                 peer: null,
