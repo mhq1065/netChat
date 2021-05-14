@@ -373,6 +373,7 @@
                 let fileInfo = fs.statSync(filename);
                 t.fileInfo = fileInfo;
                 t.filename = filename;
+                t.position = 0;
                 console.log(`文件大小:${fileInfo.size}`);
 
                 // 获取文件传输websocket
@@ -605,7 +606,6 @@
                                     break;
                                 }
                             }
-
                             break;
                         default:
                             break;
@@ -629,7 +629,7 @@
                         if (_.res == "OK") {
                             console.log("file websocket connected");
                         } else {
-                            if (_.op == "start") {
+                            if (_.op == "start" && _.start === 0) {
                                 recievefile = JSON.parse(event.data);
                                 console.log("start recieve file", recievefile);
                                 for (let i = 0; i < this.msgs.length; i++) {
@@ -652,14 +652,12 @@
                             }
                         }
                     } else {
-                        console.log("recieve file", toBuffer(event.data));
-
+                        // console.log("recieve file", toBuffer(event.data));
                         fs.appendFileSync(
                             PATH + recievefile.name,
                             toBuffer(event.data)
                         );
                         t.start += 1;
-                        console.log(t);
                     }
                 };
             },

@@ -4,8 +4,8 @@
         <div>{{ filename }}</div>
         <div>{{ file.send.fileInfo.size || "" }}</div>
         <br />
-        <button @click="sendFile" v-show="!file.send.start">send</button>
-        <br v-show="!file.send.start" />
+        <button @click="sendFile">send</button>
+        <br />
         <button @click="changeState">
             {{ file.send.pause ? "继续" : "暂停" }}
         </button>
