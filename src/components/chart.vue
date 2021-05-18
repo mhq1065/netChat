@@ -253,11 +253,6 @@
             // 创建视频p2p链接
             async createvideoPeer() {
                 console.log("videobox init");
-                if (!this.msgs[this.curname].frid) {
-                    this.msgs[this.curname].frid = await this.getfrid(
-                        this.msgs[this.curname].conv_id
-                    );
-                }
                 navigator.mediaDevices
                     .getUserMedia({ video: { width: 240, height: 160 } })
                     .then((stream) => {
@@ -308,11 +303,11 @@
             async revieve(id, data) {
                 let video = document.getElementById("peervideo");
                 let localvideo = document.getElementById("video");
-                if (!this.msgs[this.curname].frid) {
-                    this.msgs[this.curname].frid = await this.getfrid(
-                        this.msgs[this.curname].conv_id
-                    );
-                }
+                // if (!this.msgs[this.curname].frid) {
+                //     this.msgs[this.curname].frid = await this.getfrid(
+                //         this.msgs[this.curname].conv_id
+                //     );
+                // }
                 navigator.mediaDevices
                     .getUserMedia({ video: { width: 240, height: 160 } })
                     .then((stream) => {
@@ -512,15 +507,17 @@
                     path: "/convlist",
                 });
                 request.on("response", (response) => {
-                    response.on("data", (chunk) => {
+                    response.on("data", async (chunk) => {
                         let data = JSON.parse(chunk);
                         console.log(`BODY: `, data);
                         if (data.res == "OK") {
-                            this.msgs = data.convlist.map((i) => {
-                                return {
-                                    frid: null,
-                                    conv_id: i.conv_id,
-                                    name: i.name,
+                            let t = [];
+                            for (let i = 0; i < data.convlist.length; i++) {
+                                const element = data.convlist[i];
+                                t.push({
+                                    frid: await this.getfrid(element.conv_id),
+                                    conv_id: element.conv_id,
+                                    name: element.name,
                                     msgList: [],
                                     file: {
                                         send: {
@@ -534,8 +531,9 @@
                                         },
                                         recieve: [],
                                     },
-                                };
-                            });
+                                });
+                            }
+                            this.msgs = t;
                         } else {
                             console.log("error", data);
                         }
@@ -794,13 +792,16 @@
                 content: "chat",
                 p2pconfig: {
                     iceServers: [
+                        // {
+                        //     urls: "stun:hwc.l2d.top:3478",
+                        // },
+                        // {
+                        //     urls: "turn:hwc.l2d.top:3478", // A TURN server
+                        //     username: "test",
+                        //     credential: "123456",
+                        // },
                         {
-                            urls: "stun:hwc.l2d.top:3478",
-                        },
-                        {
-                            urls: "turn:hwc.l2d.top:3478", // A TURN server
-                            username: "test",
-                            credential: "123456",
+                            urls: "stun:stun.l.google.com:19302",
                         },
                     ],
                 },
